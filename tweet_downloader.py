@@ -62,7 +62,10 @@ def download(arguments, twitter):
     if arguments.inputformat == "json":
         parse_input_line = parse_input_json
 
-    with open(arguments.inputfile + "." + arguments.outputtype, "w") as fw:
+    with open("{}/{}.{}".format(
+        arguments.outdir,
+        arguments.inputfile,
+        arguments.outputtype), "w") as fw:
         resume_id = None
         resumed_number = 0
         corrupted_lines = 0
@@ -148,6 +151,7 @@ if __name__ == "__main__":
             (2) tsv: headless tab seperated file with first column as tweet id
             ''')
     parser.add_argument('--resumefile', type=str, required = False, help = 'Resume file one tweet json per line')
+    parser.add_argument('--outdir', type=str, required = False, default='./', help = 'Output directory')
     parser.add_argument('--outputtype', type=str, default='IdTweet', choices = ['json', 'IdTweet'], help = '''\
         Output data type:
         (1) json: raw JSON data from Twitter API;
