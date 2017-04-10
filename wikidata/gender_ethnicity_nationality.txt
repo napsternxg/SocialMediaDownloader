@@ -1,0 +1,14 @@
+#People whose gender we know we don't know
+#added before 2016-10
+#Demonstrates "unknown value" handling
+#(COUNT(?human) AS ?count)
+#GROUP BY ?genderLabel
+#ORDER BY DESC(?count)
+SELECT DISTINCT ?genderLabel ?human ?humanLabel ?_ethnic_groupLabel ?_country_of_citizenshipLabel WHERE {
+  ?human wdt:P31 wd:Q5.
+  ?human wdt:P21 ?gender.
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "en". }
+  FILTER(!ISBLANK(?gender))
+  OPTIONAL { ?human wdt:P172 ?_ethnic_group. }
+  OPTIONAL { ?human wdt:P27 ?_country_of_citizenship. }
+}

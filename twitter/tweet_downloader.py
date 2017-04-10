@@ -130,6 +130,7 @@ def download(arguments, twitter):
                     time.sleep(SLEEP_TIME)
                 if tid_number % PRINT_EVERY == 0:
                     print "Downloaded %s tweets" % tid_number 
+        print "Finished all downloading %s tweets" % tid_number 
 
 def main(arguments):
     twitter = get_creds(arguments.credentials)
