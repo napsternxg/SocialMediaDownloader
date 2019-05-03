@@ -1,20 +1,15 @@
 
 # coding: utf-8
 
-# In[1]:
-
 import pandas as pd
 import requests
 
 import json
 import os
-# In[2]:
+
 
 BASE_URL="https://graph.facebook.com/v2.8/"
-QUERY_URL="%s?fields=created_time,from,id,comments.limit(%s){created_time,from,id,comment_count,like_count,message},likes{id,link,name,profile_type,pic_large},reactions{name,link,type,pic_large},source&summary=true"
-
-
-# In[3]:
+QUERY_URL="{post_id}?fields=created_time,from,id,comments.limit({num_comments}){created_time,from,id,comment_count,like_count,message},likes{id,link,name,profile_type,pic_large},reactions{name,link,type,pic_large},source&summary=true"
 
 def check_next(block):
     if "paging" not in block:
@@ -24,10 +19,6 @@ def check_next(block):
     return True
 
 
-# In[9]:
-
-# In[44]:
-
 class Post(object):
     block_names = ["comments", "likes", "reactions"]
     def __init__(self, post_id, access_token, out_dir, num_comments=100):
@@ -35,38 +26,41 @@ class Post(object):
         self.access_token = access_token
         self.out_dir=out_dir
         if not os.path.exists(self.out_dir):
-            print("Output directory %s doesn't exist. Creating now." % self.out_dir)
+            print(f"Output directory {self.out_dir} doesn't exist. Creating now.")
             os.makedirs(self.out_dir)
-        self.base_query = "%s/%s&access_token=%s" % (
-                BASE_URL,
-                QUERY_URL % (post_id, num_comments),
-                self.access_token
-        )
+        final_query_url = QUERY_URL.format(post_id=post_id, num_comments=num_comments)
+        self.base_query = f"{BASE_URL}/{final_query_url}&access_token={self.access_token}"
         
+    def get_block_filename(self, block_name="base", suffix="json"):
+        base_filename = f"{self.post_id}.{block_name}.{suffix}"
+        filename = os.path.join(self.out_dir, base_filename)
+        return filename
+
     def get_base_data(self):
         response = requests.get(self.base_query)
-        print response
+        print(response)
         data = response.json()
         self.base_data = data
         self.comments = data["comments"]["data"]
         self.likes = data["likes"]["data"]
         self.reactions = data["reactions"]["data"]
-        
-        with open("%s/%s.base.json" % (self.out_dir, self.post_id), "wb+") as fp:
+        filename = self.get_block_filename(block_name="base")
+        with open(filename, "w+") as fp:
             json.dump(self.base_data, fp)
-           
-    
+        
     def get_block_data(self, block_name="comments"):
         curr_block = self.base_data[block_name]
         block_data = getattr(self, block_name)
-        print "fetching %s block" % block_name
+        print(f"fetching {block_name} block")
         while check_next(curr_block):
             response = requests.get(curr_block["paging"]["next"])
             curr_block = response.json()
             block_data.extend(curr_block["data"])
         
-        print "Extracted %s %s data" % (len(block_data), block_name)
-        with open("%s/%s.%s.json" % (self.out_dir, self.post_id, block_name), "wb+") as fp:
+        print(f"Extracted {len(block_data)} {block_name} data")
+        filename = self.get_block_filename(block_name)
+
+        with open(filename, "w+") as fp:
             json.dump(block_data, fp)            
             
     def get_all_data(self):
@@ -76,20 +70,18 @@ class Post(object):
 
 
     def comments_to_df(self):
-        comments_file = "%s/%s.comments.json" % (self.out_dir, self.post_id)
+        block_name = "comments"
+        comments_file = self.get_block_filename(block_name)
         df = pd.read_json(comments_file, orient="records")
-        print df.shape
+        print(df.shape)
         df = pd.concat([df, df["from"].apply(lambda x: pd.Series(x)).rename(columns={
             "id": "from_id",
             "name": "from_name",
         })], axis=1)
-        print df.shape
-        df.drop("from", axis=1).to_csv(
-                "%s/%s.comments.txt" % (self.out_dir, self.post_id),
-                sep="\t",
-                index=False,
-                encoding='utf-8')
-# In[27]:
+        print(df.shape)
+        output_file = self.get_block_filename(block_name, suffix="txt")
+        df.drop("from", axis=1).to_csv(output_file, sep="\t", index=False, encoding='utf-8')
+
 
 def main(post_ids, access_token, block_names=("comments",), out_dir="./"):
     Post.block_names = list(block_names)
@@ -98,7 +90,7 @@ def main(post_ids, access_token, block_names=("comments",), out_dir="./"):
             "out_dir": out_dir,
     }
     for post_id in post_ids:
-        print "Processing data for: %s" % post_id
+        print(f"Processing data for: {post_id}")
         post_obj = Post(post_id, **params)
         post_obj.get_all_data()
         post_obj.comments_to_df()
